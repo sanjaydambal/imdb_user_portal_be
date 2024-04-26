@@ -175,62 +175,65 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 });
+app.get('/api/user/:userId/ratings/:movieId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const movieId = req.params.movieId;
+        console.log(userId)
+        console.log(movieId)
+        const query = 'SELECT rating FROM movie_ratings WHERE customer_id = $1 AND movie_id = $2';
+        const result = await pool.query(query, [userId, movieId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Rating not found' });
+        }
+        const rating = result.rows[0].rating;
+        res.status(200).json({ success: true, rating });
+    } catch (error) {
+        console.error('Error fetching user rating:', error);
+        res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+});
+
+// Get user ratings
 app.get('/api/user/:userId/ratings', verifyToken, async (req, res) => {
     try {
         const { userId } = req.params;
-
-        // Fetch user ratings from the database based on the userId
         const query = 'SELECT movie_id, rating FROM movie_ratings WHERE customer_id = $1';
         const result = await pool.query(query, [userId]);
-
-        // Convert the result into an object where movie_id is the key and rating is the value
         const userRatings = {};
         result.rows.forEach((row) => {
             userRatings[row.movie_id] = row.rating;
         });
-console.log(userRatings)
         res.status(200).json({ success: true, ratings: userRatings });
     } catch (error) {
         console.error('Error fetching user ratings:', error);
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 });
-// Get user ratings
-// app.get('/api/user/:userId/ratings', verifyToken, async (req, res) => {
-//     try {
-//         const { userId } = req.params;
-//         const query = 'SELECT movie_id, rating FROM movie_ratings WHERE customer_id = $1';
-//         const result = await pool.query(query, [userId]);
-//         const userRatings = {};
-//         result.rows.forEach((row) => {
-//             userRatings[row.movie_id] = row.rating;
-//         });
-//         res.status(200).json({ success: true, ratings: userRatings });
-//     } catch (error) {
-//         console.error('Error fetching user ratings:', error);
-//         res.status(500).json({ success: false, error: 'Internal Server Error' });
-//     }
-// });
-app.get('/api/public/movies/:movieId',async(req,res)=>{
-    try{
-        const movieId = req.params?.id;
-        if(!movieId){
-            return res.status(401).json({success:false,err:"movie id is missing"})
+app.get('/api/public/movies/:movieId', async (req, res) => {
+    try {
+        const movieId = req.params.movieId;
+        if (!movieId) {
+            return res.status(400).json({ success: false, error: "Movie ID is missing." });
         }
-        const query = `select m.*, coalesce(cast(avg(r.rating) as numeric(10,2)),0) as rating from movies m left join movie_ratings r on m.id = r.movie_id where m.id = $1 group by m.id;`
-        const result = await pool.query(query,[movieId])
-        if(result.rows.length === 0){
-            return res.status(401).json({success:false,err:"movie not found"})
+        const query = `
+            SELECT m.*, COALESCE(CAST(AVG(r.rating) AS NUMERIC(10, 2)), 0) AS rating 
+            FROM movies m 
+            LEFT JOIN movie_ratings r ON m.id = r.movie_id 
+            WHERE m.id = $1 
+            GROUP BY m.id`;
+        const result = await pool.query(query, [movieId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: "Movie not found." });
         }
-        const movie = result.rows[0]
-        res.status(201).json({success:trur,movie})
-    }catch (error) {
+        const movie = result.rows[0];
+        res.status(200).json({ success: true, movie });
+    } catch (error) {
         console.error('Error fetching movie:', error);
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
+});
 
-
-})
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
